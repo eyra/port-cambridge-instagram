@@ -2,6 +2,8 @@
 
 release.zip
 
+.vscode/
+*.pyc
 # dependencies
 /node_modules
 /.pnp
