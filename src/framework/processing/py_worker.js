@@ -61,12 +61,12 @@ function unwrap(response) {
 
 function copyFileToPyFS(file, resolve) {
   directoryName = `/file-input`
-  pathStats = self.pyodide.FS.analyzePath(directoryName)
-  if (!pathStats.exists) {
-    self.pyodide.FS.mkdir(directoryName)
-  } else {
-    self.pyodide.FS.unmount(directoryName)
-  }
+  // pathStats = self.pyodide.FS.analyzePath(directoryName)
+  // if (!pathStats.exists) {
+  self.pyodide.FS.mkdir(directoryName)
+  // } else {
+  //   self.pyodide.FS.unmount(directoryName)
+  // }
   self.pyodide.FS.mount(
     self.pyodide.FS.filesystems.WORKERFS,
     {
@@ -74,6 +74,7 @@ function copyFileToPyFS(file, resolve) {
     },
     directoryName
   )
+  console.log(file.name)
   resolve({ __type__: 'PayloadString', value: directoryName + '/' + file.name })
 }
 
@@ -90,11 +91,11 @@ function initialise() {
 }
 
 function startPyodide() {
-  importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.0/full/pyodide.js')
+  importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js')
 
   console.log('[ProcessingWorker] loading Pyodide')
   return loadPyodide({
-    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.0/full/'
+    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/'
   })
 }
 

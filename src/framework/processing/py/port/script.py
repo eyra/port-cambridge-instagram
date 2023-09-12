@@ -1,20 +1,28 @@
 import itertools
 import port.api.props as props
-from port.api.commands import (CommandSystemDonate, CommandUIRender)
+from port.api.commands import CommandSystemDonate, CommandUIRender
 
 import pandas as pd
 import zipfile
 import json
 import datetime
-from collections import defaultdict
+import fnmatch
+from collections import defaultdict, namedtuple
+from contextlib import suppress
+
 ##########################
 # TikTok file processing #
 ##########################
 
-filter_start = datetime.datetime(2021, 1, 1)
+filter_start = datetime.datetime(1990, 1, 1)
 filter_end = datetime.datetime(2025, 1, 1)
 
 datetime_format = "%Y-%m-%d %H:%M:%S"
+
+
+def parse_datetime(value):
+    return datetime.datetime.fromtimestamp(value)
+
 
 def get_in(data_dict, *key_path):
     for k in key_path:
@@ -23,21 +31,52 @@ def get_in(data_dict, *key_path):
             return None
     return data_dict
 
-def get_video_list_data(data):
-    return get_in(data, "Activity", "Video Browsing History", "VideoList")
+
+def get_list(data_dict, *key_path):
+    result = get_in(data_dict, *key_path)
+    if result is None:
+        return []
+    return result
+
+
+def get_dict(data_dict, *key_path):
+    result = get_in(data_dict, *key_path)
+    if result is None:
+        return {}
+    return result
+
+
+def get_string(data_dict, *key_path):
+    result = get_in(data_dict, *key_path)
+    if result is None:
+        return ""
+    return result
+
+
+def cast_number(data_dict, *key_path):
+    value = get_in(data_dict, *key_path)
+    if value is None or value == "None":
+        return 0
+    return value
+
+
+def get_activity_video_browsing_list_data(data):
+    return get_list(data, "Activity", "Video Browsing History", "VideoList")
+
 
 def get_comment_list_data(data):
     return get_in(data, "Comment", "Comments", "CommentsList")
 
-def get_date_filtered_items(items):
-    for item in items:
-        timestamp =datetime.datetime.strptime(item["Date"], datetime_format)
+
+def filter_timestamps(timestamps):
+    for timestamp in timestamps:
         if timestamp < filter_start or timestamp > filter_end:
             continue
-        yield (timestamp, item)
+        yield timestamp
+
 
 def get_count_by_date_key(timestamps, key_func):
-    """ Returns a list of tuples of the form (key, count)
+    """Returns a dict of the form (key, count)
 
     The key is determined by the key_func, which takes a datetime object and
     returns an object suitable for sorting and usage as a dictionary key.
@@ -49,17 +88,35 @@ def get_count_by_date_key(timestamps, key_func):
         item_count[key_func(timestamp)] += 1
     return sorted(item_count.items())
 
+
 def get_all_first(items):
     return (i[0] for i in items)
 
+
 def hourly_key(date):
-    return date.strftime("%Y-%m-%d %H" )
+    return date.replace(minute=0, second=0, microsecond=0)
+
 
 def daily_key(date):
-    return date.strftime("%Y-%m-%d")
+    return date.date()
+
+
+# =====================
+def glob(zipfile, pattern):
+    return fnmatch.filter(zipfile.namelist(), pattern)
+
+
+def glob_json(zipfile, pattern):
+    for name in glob(zipfile, pattern):
+        with zipfile.open(name) as f:
+            yield json.load(f)
+
+
+# =====================
+
 
 def get_sessions(timestamps):
-    """ Returns a list of tuples of the form (start, end, duration)
+    """Returns a list of tuples of the form (start, end, duration)
 
     The start and end are datetime objects, and the duration is a timedelta
     object.
@@ -74,147 +131,494 @@ def get_sessions(timestamps):
     start = timestamps[0]
     end = timestamps[0]
     for prev, cur in zip(timestamps, timestamps[1:]):
-        if cur - prev > datetime.timedelta(hours=1):
-            sessions.append((start, end, end-start))
+        if cur - prev > datetime.timedelta(minutes=5):
+            sessions.append((start, end, end - start))
             start = cur
         end = cur
-    sessions.append((start, end, end-start))
+    sessions.append((start, end, end - start))
     return sessions
 
-def get_json_data(zip_file):
-    with zipfile.ZipFile(zip_file, "r") as zip:
-        for name in zip.namelist():
-            if not name.endswith(".json"):
-                continue
-            with zip.open(name) as json_file:
-                yield json.load(json_file)
+
+def filtered_count(data, *key_path):
+    items = get_list(data, *key_path)
+    filtered_items = get_date_filtered_items(items)
+    return len(list(filtered_items))
 
 
-def extract_tiktok_data(zip_file):
-    for data in get_json_data(zip_file):
-        videos = list(get_all_first(get_date_filtered_items(get_video_list_data(data))))
-        video_counts=  get_count_by_date_key(videos, hourly_key)
-        table_title = props.Translatable({
-            "en": "TikTok video browsing history",
-            "nl": "TikTok video geschiedenis"
-        })
-        print(video_counts)
-        data_frame = pd.DataFrame(video_counts, columns=["Hour", "View Count"])
-        return [props.PropsUIPromptConsentFormTable("tiktok_video_counts", table_title, data_frame)]
+def get_chat_history(data):
+    return get_dict(data, "Direct Messages", "Chat History", "ChatHistory")
 
 
-        # comment_list_dates = list(get_all_first(get_date_filtered_items(get_comment_list_data(data))))
-        # sessions = get_sessions(itertools.chain(video_dates, comment_list_dates))
-        # yield sessions
+def flatten_chat_history(history):
+    return itertools.chain(*history.values())
 
-# data = json.load(open(sys.argv[1]))
 
-# from pprint import pprint
-# video_dates = list(get_all_first(get_date_filtered_items(get_video_list_data(data))))
-# pprint(get_count_by_date_key(video_dates, hourly_key))
-# pprint(get_count_by_date_key(video_dates, daily_key))
-# print("#"*80)
-# comment_list_dates = list(get_all_first(get_date_filtered_items(get_comment_list_data(data))))
-# pprint(get_count_by_date_key(comment_list_dates, hourly_key))
-# pprint(get_count_by_date_key(comment_list_dates, daily_key))
+def filter_by_key(items, key, value):
+    return filter(lambda item: item[key] == value, items)
 
-# sessions = get_sessions(itertools.chain(video_dates, comment_list_dates))
-# pprint(sessions)
+
+def exclude_by_key(items, key, value):
+    """
+    Return a filtered list where items that match key & value are excluded.
+    """
+    return filter(lambda item: item[key] != value, items)
+
+
+def map_to_timeslot(series):
+    return series.map(lambda hour: f"{hour}-{hour+1}")
+
+
+def count_items(zipfile, pattern, key):
+    count = 0
+    for data in glob_json(zipfile, pattern):
+        # Some files have dictionary, others a list of dictionaries. Normalize
+        # this to always a list so the rest of the code works regardless.
+        if isinstance(data, dict):
+            data = [data]
+        for item in data:
+            count += len(item[key]) 
+    return count
+
+
+def count_posts(zipfile):
+    return sum(len(data) for data in glob_json(zipfile, "content/posts_*.json"))
+
+
+def count_messages(zipfile):
+    counts = {"sent": 0, "received": 0}
+    for data in glob_json(zipfile, "messages/inbox/**/message_*.json"):
+        donating_user = get_donating_user(data)
+        for message in data["messages"]:
+            key = "sent" if message["sender_name"] == donating_user else "received"
+            counts[key] += 1
+    return counts
+
+
+def get_donating_user(data):
+    participants = data["participants"]
+    return participants[len(participants)-1]["name"]
+
+def extract_summary_data(zipfile):
+    message_counts = count_messages(zipfile)
+    summary_data = {
+        "Description": [
+            "Followers",
+            "Following",
+            "Posts",
+            "Comments posted",
+            "Videos watched",
+            "Posts viewed",
+            "Messages sent",
+            "Messages received",
+            "Ads viewed",
+        ],
+        "Number": [
+            count_items(
+                zipfile, "followers_and_following/followers_*.json", "string_list_data"
+            ),
+            count_items(
+                zipfile,
+                "followers_and_following/following.json",
+                "relationships_following",
+            ),
+            count_posts(zipfile),
+            count_items(
+                zipfile, "comments/post_comments.json", "comments_media_comments"
+            ),
+            count_items(
+                zipfile,
+                "ads_and_topics/videos_watched.json",
+                "impressions_history_videos_watched",
+            ),
+            count_items(
+                zipfile,
+                "ads_and_topics/posts_viewed.json",
+                "impressions_history_posts_seen",
+            ),
+            message_counts["sent"],
+            message_counts["received"],
+            count_items(
+                zipfile,
+                "ads_and_topics/ads_viewed.json",
+                "impressions_history_ads_seen",
+            ),
+        ],
+    }
+
+    return ExtractionResult(
+        "instagram_summary",
+        props.Translatable(
+            {"en": "Summary information", "nl": "Samenvatting gegevens"}
+        ),
+        pd.DataFrame(summary_data),
+    )
+
+
+def extract_direct_message_activity(zipfile):
+    counter = itertools.count()
+    person_ids = defaultdict(lambda: next(counter))
+    sender_ids = []
+    timestamps = []
+    for data in glob_json(zipfile, "messages/inbox/**/message_*.json"):
+        # Ensure the donating user is the first to get an ID
+        donating_user = get_donating_user(data)
+        person_ids[donating_user]
+        for message in data["messages"]:
+            sender_ids.append(person_ids[message["sender_name"]])
+            timestamps.append(parse_datetime(message["timestamp_ms"] / 1000))
+    df = pd.DataFrame({"Anonymous ID": sender_ids, "Sent": timestamps})
+    df["Sent"] = pd.to_datetime(df["Sent"]).dt.strftime("%Y-%m-%d %H:%M")
+    return ExtractionResult(
+        "instagram_direct_message_activity",
+        props.Translatable(
+            {"en": "Direct message activity", "nl": "Bericht activiteit"}
+        ),
+        df,
+    )
+
+
+def extract_comment_activity(zipfile):
+    timestamps = []
+    for data in glob_json(zipfile, "comments/post_comments.json"):
+        for item in data["comments_media_comments"]:
+            timestamps.append(
+                parse_datetime(item["string_map_data"]["Time"]["timestamp"])
+            )
+    df = pd.DataFrame({"Posted": timestamps})
+    df = df.sort_values("Posted")
+    df["Posted"] = pd.to_datetime(df["Posted"]).dt.strftime("%Y-%m-%d %H:%M")
+    return ExtractionResult(
+        "instagram_comment_activity",
+        props.Translatable({"en": "Comment activity", "nl": "Commentaar activiteit"}),
+        df,
+    )
+
+
+def extract_posts_liked(zipfile):
+    urls = []
+    timestamps = []
+    for data in glob_json(zipfile, "likes/liked_posts.json"):
+        for item in data["likes_media_likes"]:
+            info = item["string_list_data"][0]
+            timestamps.append(parse_datetime(info["timestamp"]))
+            urls.append(info["href"])
+    df = pd.DataFrame({"Liked": timestamps, "Link": urls})
+    df["Liked"] = pd.to_datetime(df["Liked"]).dt.strftime("%Y-%m-%d %H:%M")
+    df = df.sort_values("Liked")
+    return ExtractionResult(
+        "instagram_posts_liked",
+        props.Translatable({"en": "Posts Liked", "nl": "Geliked"}),
+        df,
+    )
+
+
+def flatten_media(items):
+    for item in items:
+        yield from item["media"]
+
+
+def get_creation_timestamps(items):
+    for item in items:
+        yield parse_datetime(item["creation_timestamp"])
+
+
+def get_media_creation_timestamps(items):
+    return get_creation_timestamps(flatten_media(items))
+
+
+def get_content_posts_timestamps(zipfile):
+    for data in glob_json(zipfile, "content/posts_*.json"):
+        yield from get_media_creation_timestamps(data)
+
+
+def get_media_timestamps(zipfile, pattern, key):
+    for data in glob_json(zipfile, pattern):
+        yield from get_media_creation_timestamps(data[key])
+
+
+def df_from_timestamps(timestamps, column):
+    df = pd.DataFrame({"timestamps": timestamps})
+    counts = df.groupby(lambda x: hourly_key(df["timestamps"][x])).size()
+
+    df = counts.reset_index()
+    df.columns = ["timestamp", column]
+    return df
+
+
+def stories_timestamps(zipfile):
+    for data in glob_json(zipfile, "content/stories.json"):
+        for item in data["ig_stories"]:
+            yield parse_datetime(item["creation_timestamp"])
+
+
+def df_from_timestamp_columns(a, b):
+    data_frames = [
+        df_from_timestamps(timestamps, column) for timestamps, column in [a, b]
+    ]
+
+    df = pd.merge(
+        data_frames[0],
+        data_frames[1],
+        left_on="timestamp",
+        right_on="timestamp",
+        how="outer",
+    ).sort_index()
+    df["Date"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m-%d")
+    df["Timeslot"] = map_to_timeslot(pd.to_datetime(df["timestamp"]).dt.hour)
+    df = df.reset_index(drop=True)
+    df = (
+        df.reindex(columns=["Date", "Timeslot", a[1], b[1]])
+        .reset_index(drop=True)
+        .fillna(0)
+    )
+    df[a[1]] = df[a[1]].astype(int)
+    df[b[1]] = df[b[1]].astype(int)
+    return df
+
+
+def get_video_posts_timestamps(zipfile):
+    return itertools.chain(
+        get_content_posts_timestamps(zipfile),
+        get_media_timestamps(zipfile, "content/igtv_videos.json", "ig_igtv_media"),
+        get_media_timestamps(zipfile, "content/reels.json", "ig_reels_media"),
+    )
+
+
+def extract_video_posts(zipfile):
+    video_timestamps = get_video_posts_timestamps(zipfile)
+    df = df_from_timestamp_columns(
+        (video_timestamps, "Videos"), (stories_timestamps(zipfile), "Stories")
+    )
+    return ExtractionResult(
+        "instagram_video_posts",
+        props.Translatable({"en": "Posts", "nl": "Posts"}),
+        df,
+    )
+
+
+def get_post_comments_timestamps(zipfile):
+    return get_string_map_timestamps(
+        zipfile, "comments/post_comments.json", "comments_media_comments"
+    )
+
+
+def get_string_list_timestamps(zipfile, pattern, key):
+    for data in glob_json(zipfile, pattern):
+        for item in data[key]:
+            yield parse_datetime(item["string_list_data"][0]["timestamp"])
+
+
+def get_string_map_timestamps(zipfile, pattern, key):
+    for data in glob_json(zipfile, pattern):
+        for item in data[key]:
+            yield parse_datetime(item["string_map_data"]["Time"]["timestamp"])
+
+
+def get_likes_timestamps(zipfile):
+    return itertools.chain(
+        get_string_list_timestamps(
+            zipfile, "likes/liked_comments.json", "likes_comment_likes"
+        ),
+        get_string_list_timestamps(
+            zipfile, "likes/liked_posts.json", "likes_media_likes"
+        ),
+    )
+
+
+def extract_comments_and_likes(zipfile):
+    comment_timestamps = get_post_comments_timestamps(zipfile)
+    likes_timestamps = get_likes_timestamps(zipfile)
+    df = df_from_timestamp_columns(
+        (comment_timestamps, "Comments"), (likes_timestamps, "Likes")
+    )
+    return ExtractionResult(
+        "instagram_comments_and_likes",
+        props.Translatable({"en": "Comments and likes", "nl": "Comments en likes"}),
+        df,
+    )
+
+
+def extract_viewed(zipfile):
+    df = df_from_timestamp_columns(
+        (
+            get_string_map_timestamps(
+                zipfile,
+                "ads_and_topics/videos_watched.json",
+                "impressions_history_videos_watched",
+            ),
+            "Videos",
+        ),
+        (
+            get_string_map_timestamps(
+                zipfile,
+                "ads_and_topics/posts_viewed.json",
+                "impressions_history_posts_seen",
+            ),
+            "Posts",
+        ),
+    )
+    return ExtractionResult(
+        "instagram_viewed",
+        props.Translatable({"en": "Viewed", "nl": "Viewed"}),
+        df,
+    )
+
+
+def extract_session_info(zipfile):
+    timestamps = list(
+        itertools.chain(
+            list(get_video_posts_timestamps(zipfile)),
+            list(stories_timestamps(zipfile)),
+            list(get_post_comments_timestamps(zipfile)),
+            list(get_likes_timestamps(zipfile)),
+        )
+    )
+    sessions = get_sessions(timestamps)
+    df = pd.DataFrame(sessions, columns=["Start", "End", "Duration"])
+    df["Start"] = pd.to_datetime(df["Start"]).dt.strftime("%Y-%m-%d %H:%M")
+    df["Duration (in minutes)"] = (pd.to_timedelta(df["Duration"]).dt.total_seconds() / 60).round(2)
+    df = df.drop("End", axis=1)
+    df = df.drop("Duration", axis=1)
+
+    return ExtractionResult(
+        "instagram_session_info",
+        props.Translatable({"en": "Session information", "nl": "Sessie informatie"}),
+        df,
+    )
+
+
+def extract_data(path):
+    extractors = [
+        extract_summary_data,
+        extract_video_posts,
+        extract_comments_and_likes,
+        extract_viewed,
+        extract_session_info,
+        extract_direct_message_activity,
+        extract_comment_activity,
+        extract_posts_liked,
+    ]
+
+    zfile = zipfile.ZipFile(path)
+
+    return [extractor(zfile) for extractor in extractors]
 
 
 ######################
 # Data donation flow #
 ######################
 
-def process_tiktok(sessionId):
-    progress = 0
-    platform = "TikTok"
-    meta_data = []
-    data = None
-    while True:
-        promptFile = prompt_file(platform, "application/zip, text/plain")
-        fileResult = yield render_donation_page(platform, promptFile, progress)
-        if fileResult.__type__ != 'PayloadString':
-            meta_data.append(("debug", f"{platform}: skip to next step"))
-            break
 
-        meta_data.append(("debug", f"{platform}: extracting file"))
-        extractionResult = extract_tiktok_data(fileResult.value)
-        if extractionResult != 'invalid':
-            meta_data.append(("debug", f"{platform}: extraction successful, go to consent form"))
-            data = extractionResult
-            break
+ExtractionResult = namedtuple("ExtractionResult", ["id", "title", "data_frame"])
 
-        meta_data.append(("debug", f"{platform}: prompt confirmation to retry file selection"))
-        retry_result = yield render_donation_page(platform, retry_confirmation(platform), progress)
-        if retry_result.__type__ == 'PayloadTrue':
-            meta_data.append(("debug", f"{platform}: skip due to invalid file"))
-            continue
 
-        meta_data.append(("debug", f"{platform}: retry prompt file"))
-        break
-    if data:
-        meta_data.append(("debug", f"{platform}: prompt consent"))
-        consent_result = yield render_donation_page(platform, props.PropsUIPromptConsentForm(data, []), progress)
+class SkipToNextStep(Exception):
+    pass
+
+
+class DataDonationProcessor:
+    def __init__(self, platform, mime_types, extractor, session_id):
+        self.platform = platform
+        self.mime_types = mime_types
+        self.extractor = extractor
+        self.session_id = session_id
+        self.progress = 0
+        self.meta_data = []
+
+    def process(self):
+        with suppress(SkipToNextStep):
+            while True:
+                file_result = yield from self.prompt_file()
+
+                self.log(f"extracting file")
+                try:
+                    extraction_result = self.extract_data(file_result.value)
+                except IOError as e:
+                    raise
+                    self.log(f"prompt confirmation to retry file selection")
+                    yield from self.prompt_retry()
+                    return
+                else:
+                    if extraction_result is None:
+                        try_again = yield from self.prompt_retry()
+                        if try_again:
+                            continue
+                        else:
+                            return
+                    self.log(f"extraction successful, go to consent form")
+                    yield from self.prompt_consent(extraction_result)
+
+    def prompt_retry(self):
+        retry_result = yield render_donation_page(
+            self.platform, retry_confirmation(self.platform), self.progress
+        )
+        return retry_result.__type__ == "PayloadTrue"
+
+    def prompt_file(self):
+        description = props.Translatable(
+            {
+                "en": f"Please follow the download instructions and choose the file that you stored on your device. Click “Skip” at the right bottom, if you do not have a {self.platform} file. ",
+                "nl": f"Volg de download instructies en kies het bestand dat u opgeslagen heeft op uw apparaat. Als u geen {self.platform} bestand heeft klik dan op “Overslaan” rechts onder.",
+            }
+        )
+        prompt_file = props.PropsUIPromptFileInput(description, self.mime_types)
+        file_result = yield render_donation_page(
+            self.platform, prompt_file, self.progress
+        )
+        if file_result.__type__ != "PayloadString":
+            self.log(f"skip to next step")
+            raise SkipToNextStep()
+        return file_result
+
+    def log(self, message):
+        self.meta_data.append(("debug", f"{self.platform}: {message}"))
+
+    def extract_data(self, file):
+        return self.extractor(file)
+
+    def prompt_consent(self, data):
+        log_title = props.Translatable({"en": "Log messages", "nl": "Log berichten"})
+
+        tables = [
+            props.PropsUIPromptConsentFormTable(table.id, table.title, table.data_frame)
+            for table in data
+        ]
+        meta_frame = pd.DataFrame(self.meta_data, columns=["type", "message"])
+        meta_table = props.PropsUIPromptConsentFormTable(
+            "log_messages", log_title, meta_frame
+        )
+        self.log(f"prompt consent")
+        consent_result = yield render_donation_page(
+            self.platform,
+            props.PropsUIPromptConsentForm(tables, [meta_table]),
+            self.progress,
+        )
 
         if consent_result.__type__ == "PayloadJSON":
-            meta_data.append(("debug", f"{platform}: donate consent data"))
-            yield donate(f"{sessionId}-{platform}", consent_result.value)
+            self.log(f"donate consent data")
+            yield donate(f"{self.sessionId}-{self.platform}", consent_result.value)
 
 
-def process(sessionId):
+class DataDonation:
+    def __init__(self, platform, mime_types, extractor):
+        self.platform = platform
+        self.mime_types = mime_types
+        self.extractor = extractor
+
+    def __call__(self, session_id):
+        processor = DataDonationProcessor(
+            self.platform, self.mime_types, self.extractor, session_id
+        )
+        yield from processor.process()
+
+
+data_donation = DataDonation("Instagram", "application/zip", extract_data)
+
+
+def process(session_id):
     progress = 0
-    yield donate(f"{sessionId}-tracking", '[{ "message": "user entered script" }]')
-    yield from process_tiktok(sessionId)
-
-    # subflows = len(platforms)
-    # steps = 2
-    # step_percentage = (100/subflows)/steps
-
-    # # progress in %
-    # progress = 0
-
-    # for index, platform in enumerate(platforms):
-    #     meta_data = []
-    #     meta_data.append(("debug", f"{platform}: start"))
-
-    #     # STEP 1: select the file
-    #     progress += step_percentage
-    #     data = None
-    #     while True:
-    #         meta_data.append(("debug", f"{platform}: prompt file"))
-    #         promptFile = prompt_file(platform, "application/zip, text/plain")
-    #         fileResult = yield render_donation_page(platform, promptFile, progress)
-    #         if fileResult.__type__ == 'PayloadString':
-    #             meta_data.append(("debug", f"{platform}: extracting file"))
-    #             extractionResult = doSomethingWithTheFile(platform, fileResult.value)
-    #             if extractionResult != 'invalid':
-    #                 meta_data.append(("debug", f"{platform}: extraction successful, go to consent form"))
-    #                 data = extractionResult
-    #                 break
-    #             else:
-    #                 meta_data.append(("debug", f"{platform}: prompt confirmation to retry file selection"))
-    #                 retry_result = yield render_donation_page(platform, retry_confirmation(platform), progress)
-    #                 if retry_result.__type__ == 'PayloadTrue':
-    #                     meta_data.append(("debug", f"{platform}: skip due to invalid file"))
-    #                     continue
-    #                 else:
-    #                     meta_data.append(("debug", f"{platform}: retry prompt file"))
-    #                     break
-    #         else:
-    #             meta_data.append(("debug", f"{platform}: skip to next step"))
-    #             break
-
-    #     # STEP 2: ask for consent
-    #     progress += step_percentage
-    #     if data is not None:
-    #         meta_data.append(("debug", f"{platform}: prompt consent"))
-    #         prompt = prompt_consent(platform, data, meta_data)
-    #         consent_result = yield render_donation_page(platform, prompt, progress)
-    #         if consent_result.__type__ == "PayloadJSON":
-    #             meta_data.append(("debug", f"{platform}: donate consent data"))
-    #             yield donate(f"{sessionId}-{platform}", consent_result.value)
-
+    yield donate(f"{session_id}-tracking", '[{ "message": "user entered script" }]')
+    yield from data_donation(session_id)
     yield render_end_page()
 
 
@@ -224,10 +628,7 @@ def render_end_page():
 
 
 def render_donation_page(platform, body, progress):
-    header = props.PropsUIHeader(props.Translatable({
-        "en": platform,
-        "nl": platform
-    }))
+    header = props.PropsUIHeader(props.Translatable({"en": platform, "nl": platform}))
 
     footer = props.PropsUIFooter(progress)
     page = props.PropsUIPageDonation(platform, header, body, footer)
@@ -235,66 +636,41 @@ def render_donation_page(platform, body, progress):
 
 
 def retry_confirmation(platform):
-    text = props.Translatable({
-        "en": f"Unfortunately, we cannot process your {platform} file. Continue, if you are sure that you selected the right file. Try again to select a different file.",
-        "nl": f"Helaas, kunnen we uw {platform} bestand niet verwerken. Weet u zeker dat u het juiste bestand heeft gekozen? Ga dan verder. Probeer opnieuw als u een ander bestand wilt kiezen."
-    })
-    ok = props.Translatable({
-        "en": "Try again",
-        "nl": "Probeer opnieuw"
-    })
-    cancel = props.Translatable({
-        "en": "Continue",
-        "nl": "Verder"
-    })
+    text = props.Translatable(
+        {
+            "en": f"Unfortunately, we cannot process your {platform} file. Continue, if you are sure that you selected the right file. Try again to select a different file.",
+            "nl": f"Helaas, kunnen we uw {platform} bestand niet verwerken. Weet u zeker dat u het juiste bestand heeft gekozen? Ga dan verder. Probeer opnieuw als u een ander bestand wilt kiezen.",
+        }
+    )
+    ok = props.Translatable({"en": "Try again", "nl": "Probeer opnieuw"})
+    cancel = props.Translatable({"en": "Continue", "nl": "Verder"})
     return props.PropsUIPromptConfirm(text, ok, cancel)
 
 
-def prompt_file(platform, extensions):
-    description = props.Translatable({
-        "en": f"Please follow the download instructions and choose the file that you stored on your device. Click “Skip” at the right bottom, if you do not have a {platform} file. ",
-        "nl": f"Volg de download instructies en kies het bestand dat u opgeslagen heeft op uw apparaat. Als u geen {platform} bestand heeft klik dan op “Overslaan” rechts onder."
-    })
-
-    return props.PropsUIPromptFileInput(description, extensions)
-
-
-def doSomethingWithTheFile(platform, filename):
-    return extract_zip_contents(filename)
-
-
-def extract_zip_contents(filename):
-    names = []
-    try:
-        file = zipfile.ZipFile(filename)
-        data = []
-        for name in file.namelist():
-            names.append(name)
-            info = file.getinfo(name)
-            data.append((name, info.compress_size, info.file_size))
-        return data
-    except zipfile.error:
-        return "invalid"
-
-
 def prompt_consent(id, data, meta_data):
+    table_title = props.Translatable(
+        {"en": "Zip file contents", "nl": "Inhoud zip bestand"}
+    )
 
-    table_title = props.Translatable({
-        "en": "Zip file contents",
-        "nl": "Inhoud zip bestand"
-    })
-
-    log_title = props.Translatable({
-        "en": "Log messages",
-        "nl": "Log berichten"
-    })
+    log_title = props.Translatable({"en": "Log messages", "nl": "Log berichten"})
 
     data_frame = pd.DataFrame(data, columns=["filename", "compressed size", "size"])
     table = props.PropsUIPromptConsentFormTable("zip_content", table_title, data_frame)
     meta_frame = pd.DataFrame(meta_data, columns=["type", "message"])
-    meta_table = props.PropsUIPromptConsentFormTable("log_messages", log_title, meta_frame)
+    meta_table = props.PropsUIPromptConsentFormTable(
+        "log_messages", log_title, meta_frame
+    )
     return props.PropsUIPromptConsentForm([table], [meta_table])
 
 
 def donate(key, json_string):
     return CommandSystemDonate(key, json_string)
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) > 1:
+        print(extract_data(sys.argv[1]))
+    else:
+        print("please provide a zip file as argument")

@@ -11,12 +11,14 @@ class Translations(TypedDict):
         en: English string to display
         nl: Dutch string to display
     """
+
     en: str
     nl: str
 
 @dataclass
 class Translatable:
-    """Wrapper class for Translations""" 
+    """Wrapper class for Translations"""
+
     translations: Translations
 
     def toDict(self):
@@ -30,6 +32,7 @@ class PropsUIHeader:
     Attributes:
         title: title of the page
     """
+
     title: Translatable
 
     def toDict(self):
@@ -46,6 +49,7 @@ class PropsUIFooter:
     Attributes:
         progressPercentage: float indicating the progress in the flow
     """
+
     progressPercentage: float
 
     def toDict(self):
@@ -59,14 +63,15 @@ class PropsUIFooter:
 class PropsUIPromptConfirm:
     """Retry submitting a file page
 
-    Prompt the user if they want to submit a new file. 
-    This can be used in case a file could not be processed. 
+    Prompt the user if they want to submit a new file.
+    This can be used in case a file could not be processed.
 
     Attributes:
         text: message to display
         ok: message to display if the user wants to try again
         cancel: message to display if the user wants to continue regardless
     """
+
     text: Translatable
     ok: Translatable
     cancel: Translatable
@@ -173,7 +178,7 @@ class PropsUITextVisualization:
 
 @dataclass
 class PropsUIPromptConsentFormTable:
-    """Table to be shown to the participant prior to donation 
+    """Table to be shown to the participant prior to donation
 
     Attributes:
         id: a unique string to itentify the table after donation
@@ -182,6 +187,7 @@ class PropsUIPromptConsentFormTable:
         editable: determines whether the table has an editable mode that can be toggled with a button
         visualizations: optional list of visualizations to be shown
     """
+
     id: str
     title: Translatable
     data_frame: pd.DataFrame
@@ -214,6 +220,7 @@ class PropsUIPromptConsentForm:
         tables: a list of tables
         meta_tables: a list of optional tables, for example for logging data
     """
+
     tables: list[PropsUIPromptConsentFormTable]
     meta_tables: list[PropsUIPromptConsentFormTable]
 
@@ -245,6 +252,7 @@ class PropsUIPromptFileInput:
         description: text with an explanation
         extensions: accepted mime types, example: "application/zip, text/plain"
     """
+
     description: Translatable
     extensions: str
 
@@ -263,6 +271,7 @@ class RadioItem(TypedDict):
         id: id of radio button
         value: text to be displayed
     """
+
     id: int
     value: str
 
@@ -278,6 +287,7 @@ class PropsUIPromptRadioInput:
         description: short description of the radio group
         items: a list of radio buttons
     """
+
     title: Translatable
     description: Translatable
     items: list[RadioItem]
@@ -398,6 +408,7 @@ class PropsUIPageDonation:
         body: main body of the page, see the individual classes for an explanation
         footer: page footer
     """
+
     platform: str
     header: PropsUIHeader
     body: PropsUIPromptRadioInput | PropsUIPromptConsentForm | PropsUIPromptFileInput | PropsUIPromptConfirm | PropsUIPromptQuestionnaire
@@ -416,6 +427,7 @@ class PropsUIPageDonation:
 
 class PropsUIPageEnd:
     """An ending page to show the user they are done"""
+
     def toDict(self):
         dict = {}
         dict["__type__"] = "PropsUIPageEnd"

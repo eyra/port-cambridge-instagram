@@ -4,6 +4,10 @@ release.zip
 
 .vscode/
 *.pyc
+.vscode/
+
+__pycache__
+
 # dependencies
 /node_modules
 /.pnp
