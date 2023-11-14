@@ -6,6 +6,7 @@ import pandas as pd
 import zipfile
 import json
 import datetime
+import pytz
 import fnmatch
 from collections import defaultdict, namedtuple
 from contextlib import suppress
@@ -21,7 +22,9 @@ datetime_format = "%Y-%m-%d %H:%M:%S"
 
 
 def parse_datetime(value):
-    return datetime.datetime.fromtimestamp(value)
+    utc_datetime = datetime.datetime.fromtimestamp(value, tz=datetime.timezone.utc)
+    uk_timezone = pytz.timezone('Europe/London')
+    return uk_timezone.normalize(utc_datetime.astimezone(uk_timezone))
 
 
 def get_in(data_dict, *key_path):

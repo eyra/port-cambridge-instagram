@@ -140,10 +140,10 @@ def test_video_posts_table():
 
     reference = """
              Date Timeslot  Videos  Stories
-    0  2023-03-13    22-23       2        1
-    1  2023-03-14      1-2       3        0
-    2  2023-03-14      5-6       1        0
-    3  2023-03-14    12-13       1        0
+    0  2023-03-13    21-22       2        1
+    1  2023-03-14      0-1       3        0
+    2  2023-03-14      4-5       1        0
+    3  2023-03-14    11-12       1        0
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)
@@ -173,8 +173,8 @@ def test_comments_and_likes_table():
 
     reference = """
              Date Timeslot  Comments  Likes
-    0  2023-03-13    22-23         1      2
-    1  2023-03-14      1-2         1      0
+    0  2023-03-13    21-22         1      2
+    1  2023-03-14      0-1         1      0
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)
@@ -203,8 +203,8 @@ def test_viewed_table():
 
     reference = """
              Date Timeslot  Videos  Posts
-    0  2023-03-13    22-23       2      1
-    1  2023-03-14    13-14       0      1
+    0  2023-03-13    21-22       2      1
+    1  2023-03-14    12-13       0      1
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)
@@ -218,10 +218,10 @@ def test_session_info_table():
 
     reference = """
                   Start  Duration (in minutes)
-    0  2023-03-13 22:33                   3.53
-    1  2023-03-14 01:05                   0.97
-    2  2023-03-14 05:59                   0.00
-    3  2023-03-14 12:27                   0.00
+    0  2023-03-13 21:33                   3.53
+    1  2023-03-14 00:05                   0.97
+    2  2023-03-14 04:59                   0.00
+    3  2023-03-14 11:27                   0.00
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)
@@ -272,12 +272,12 @@ def test_direct_message_activity_table():
 
     reference = """
        Anonymous ID              Sent
-    0             0  2023-02-27 11:18
-    1             1  2023-02-27 11:18
-    2             0  2023-02-27 11:19
-    3             2  2023-02-27 11:21
-    4             0  2023-02-27 11:21
-    5             2  2023-02-27 11:21
+    0             0  2023-02-27 10:18
+    1             1  2023-02-27 10:18
+    2             0  2023-02-27 10:19
+    3             2  2023-02-27 10:21
+    4             0  2023-02-27 10:21
+    5             2  2023-02-27 10:21
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)
@@ -329,11 +329,11 @@ def test_comment_activity_table():
 
     reference = """
                  Posted
-    0  2023-03-13 22:37
-    1  2023-03-13 22:37
-    2  2023-03-13 23:49
-    3  2023-03-14 00:26
-    4  2023-03-16 21:53
+    0  2023-03-13 21:37
+    1  2023-03-13 21:37
+    2  2023-03-13 22:49
+    3  2023-03-13 23:26
+    4  2023-03-16 20:53
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)
@@ -378,9 +378,9 @@ def test_posts_liked_table():
 
     reference = """
                   Liked                       Link
-    0  2023-03-13 22:37  https://example.org/test1
-    1  2023-03-13 22:37  https://example.org/test2
-    2  2023-03-13 23:49  https://example.org/test3
+    0  2023-03-13 21:37  https://example.org/test1
+    1  2023-03-13 21:37  https://example.org/test2
+    2  2023-03-13 22:49  https://example.org/test3
     """
     print(result.data_frame)
     assert_frame_str_equal(reference, result.data_frame)

@@ -108,6 +108,7 @@ function installPortPackage() {
   console.log('[ProcessingWorker] load port package')
   return self.pyodide.runPythonAsync(`
     import micropip
+    await micropip.install("https://files.pythonhosted.org/packages/32/4d/aaf7eff5deb402fd9a24a1449a8119f00d74ae9c2efa79f8ef9994261fc2/pytz-2023.3.post1-py2.py3-none-any.whl")
     await micropip.install("../../port-0.0.0-py3-none-any.whl", deps=False)
     import port
   `)
