@@ -1,7 +1,84 @@
 import { PropsUITable, TableContext } from '../../../../../types/elements'
 import { DateFormat } from '../../../../../types/visualizations'
 
-export function autoFormatDate (dateNumbers: number[], minValues: number): DateFormat {
+export function formatDate (
+  dateString: string[],
+  format: DateFormat,
+  minValues: number = 10
+): [string[], Record<string, number> | null] {
+  let formattedDate: string[] = dateString
+  const dateNumbers = dateString.map((date) => new Date(date).getTime())
+  let domain: [number, number] | null = null
+  let formatter: (date: Date) => string = (date) => date.toISOString()
+
+  if (format === 'auto') format = autoFormatDate(dateNumbers, minValues)
+
+  if (format === 'year') formatter = (date) => date.getFullYear().toString()
+
+  if (format === 'quarter') {
+    formatter = (date) => {
+      const year = date.getFullYear().toString()
+      const quarter = Math.floor(date.getMonth() / 3) + 1
+      return `${year}-Q${quarter}`
+    }
+  }
+
+  if (format === 'month') {
+    formatter = (date) => {
+      const year = date.getFullYear().toString()
+      const month = date.toLocaleString('default', { month: 'short' })
+      return `${year}-${month}`
+    }
+  }
+
+  if (format === 'day') {
+    formatter = (date) => {
+      const year = date.getFullYear().toString()
+      const month = date.toLocaleString('default', { month: 'short' })
+      const day = date.getDate().toString()
+      return `${year}-${month}-${day}`
+    }
+  }
+
+  if (format === 'hour') {
+    formatter = (date) => {
+      return date.toISOString().split('T')[1].split(':')[0]
+    }
+  }
+
+  if (format === 'month_cycle') {
+    formatter = (date) => {
+      const intlFormatter = new Intl.DateTimeFormat('default', { month: 'long' })
+      return intlFormatter.format(date)
+    }
+    // can be any year, starting at january
+    domain = [new Date('2000-01-01').getTime(), new Date('2001-01-01').getTime()]
+  }
+  if (format === 'weekday_cycle') {
+    formatter = (date) => {
+      const intlFormatter = new Intl.DateTimeFormat('default', { weekday: 'long' })
+      return intlFormatter.format(date)
+    }
+    // can be any full week, starting at monday
+    domain = [new Date('2023-11-06').getTime(), new Date('2023-11-13').getTime()]
+  }
+  if (format === 'hour_cycle') {
+    formatter = (date) => {
+      const intlFormatter = new Intl.DateTimeFormat('default', { hour: 'numeric', hour12: false })
+      return intlFormatter.format(date)
+    }
+    // can be any day, starting at midnight
+    domain = [new Date('2000-01-01').getTime(), new Date('2000-01-02').getTime()]
+  }
+
+  formattedDate = dateNumbers.map((date) => formatter(new Date(date)))
+  if (domain == null) domain = [Math.min(...dateNumbers), Math.max(...dateNumbers)]
+  const sortableDate: Record<string, number> | null = createSortable(domain, format, formatter)
+
+  return [formattedDate, sortableDate]
+}
+
+function autoFormatDate (dateNumbers: number[], minValues: number): DateFormat {
   const minTime = Math.min(...dateNumbers)
   const maxTime = Math.max(...dateNumbers)
 
@@ -14,69 +91,36 @@ export function autoFormatDate (dateNumbers: number[], minValues: number): DateF
   return autoFormat
 }
 
-export function formatDate (
-  dateString: string[],
-  format: DateFormat,
-  minValues: number = 10
-): [string[], number[] | null] {
-  let formattedDate: string[] = dateString
-  const dateNumbers = dateString.map((date) => new Date(date).getTime())
-  let sortableDate: number[] | null = null
+function createSortable (
+  domain: [number, number],
+  interval: string,
+  formatter: (date: Date) => string
+): Record<string, number> | null {
+  // creates a map of datestrings to sortby numbers. Also includes intervalls, so that
+  // addZeroes can be used.
+  const sortable: Record<string, number> = {}
+  const [minTime, maxTime] = domain
 
-  if (format === 'auto') format = autoFormatDate(dateNumbers, minValues)
+  // intervalnumbers don't need to be exact. Just small enough that they never
+  // skip over an interval (e.g., month should be shortest possible month).
+  // Duplicate dates are ignored in set
+  let intervalNumber: number = 0
+  if (interval === 'year') intervalNumber = 1000 * 60 * 60 * 24 * 364
+  if (interval === 'quarter') intervalNumber = 1000 * 60 * 60 * 24 * 28 * 3
+  if (['month', 'month_cycle'].includes(interval)) intervalNumber = 1000 * 60 * 60 * 24 * 28
+  if (['day', 'weekday_cycle'].includes(interval)) intervalNumber = 1000 * 60 * 60 * 24
+  if (['hour', 'hour_cycle'].includes(interval)) intervalNumber = 1000 * 60 * 60
 
-  if (format === 'year') {
-    formattedDate = dateNumbers.map((date) => new Date(date).getFullYear().toString())
-    sortableDate = dateNumbers
-  }
-  if (format === 'quarter') {
-    formattedDate = dateNumbers.map((date) => {
-      const year = new Date(date).getFullYear().toString()
-      const quarter = Math.floor(new Date(date).getMonth() / 3) + 1
-      return `${year}-Q${quarter}`
-    })
-    sortableDate = dateNumbers
-  }
-  if (format === 'month') {
-    formattedDate = dateNumbers.map((date) => {
-      const year = new Date(date).getFullYear().toString()
-      const month = new Date(date).toLocaleString('default', { month: 'short' })
-      return year + '-' + month
-    })
-    sortableDate = dateNumbers
-  }
-  if (format === 'day') {
-    formattedDate = dateNumbers.map((date) => new Date(date).toISOString().split('T')[0])
-    sortableDate = dateNumbers
-  }
-  if (format === 'hour') {
-    formattedDate = dateNumbers.map(
-      (date) => new Date(date).toISOString().split('T')[1].split(':')[0]
-    )
-    sortableDate = dateNumbers
-  }
-  if (format === 'month_cycle') {
-    const formatter = new Intl.DateTimeFormat('default', { month: 'long' })
-    formattedDate = dateNumbers.map((date) => formatter.format(new Date(date)))
-    sortableDate = dateNumbers.map((date) => new Date(date).getMonth())
-  }
-  if (format === 'weekday_cycle') {
-    const formatter = new Intl.DateTimeFormat('default', { weekday: 'long' })
-    formattedDate = dateNumbers.map((date) => formatter.format(new Date(date)))
-    sortableDate = dateNumbers.map((date) => new Date(date).getDay())
-  }
-  if (format === 'day_cycle') {
-    const formatter = new Intl.DateTimeFormat('default', { day: 'numeric' })
-    formattedDate = dateNumbers.map((date) => formatter.format(new Date(date)))
-    sortableDate = dateNumbers.map((date) => new Date(date).getDay())
-  }
-  if (format === 'hour_cycle') {
-    const formatter = new Intl.DateTimeFormat('default', { hour: 'numeric' })
-    formattedDate = dateNumbers.map((date) => formatter.format(new Date(date)))
-    sortableDate = dateNumbers.map((date) => new Date(date).getHours())
+  if (intervalNumber > 0) {
+    for (let i = minTime; i <= maxTime; i += intervalNumber) {
+      const date = new Date(i)
+      const datestring = formatter(date)
+      if (sortable[datestring] !== undefined) continue
+      sortable[datestring] = i
+    }
   }
 
-  return [formattedDate, sortableDate]
+  return sortable
 }
 
 export function tokenize (text: string): string[] {

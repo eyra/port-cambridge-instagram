@@ -248,12 +248,15 @@ def extract_summary_data(zipfile):
         ],
     }
 
+    visualizations = []
+
     return ExtractionResult(
         "instagram_summary",
         props.Translatable(
             {"en": "Summary information", "nl": "Samenvatting gegevens"}
         ),
         pd.DataFrame(summary_data),
+        visualizations,
     )
 
 
@@ -271,12 +274,35 @@ def extract_direct_message_activity(zipfile):
             timestamps.append(parse_datetime(message["timestamp_ms"] / 1000))
     df = pd.DataFrame({"Anonymous ID": sender_ids, "Sent": timestamps})
     df["Sent"] = pd.to_datetime(df["Sent"]).dt.strftime("%Y-%m-%d %H:%M")
+
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "Direct message activity over time",
+                    "nl": "Direct message activiteit in de loop van de tijd",
+                }
+            ),
+            type="area",
+            group=props.PropsUIChartGroup(column="Sent", dateFormat="auto"),
+            values=[
+                props.PropsUIChartValue(
+                    label="Messages",
+                    column="Anonymous ID",
+                    aggregate="count",
+                    addZeroes=True,
+                )
+            ],
+        )
+    ]
+
     return ExtractionResult(
         "instagram_direct_message_activity",
         props.Translatable(
             {"en": "Direct message activity", "nl": "Bericht activiteit"}
         ),
         df,
+        visualizations
     )
 
 
@@ -290,10 +316,33 @@ def extract_comment_activity(zipfile):
     df = pd.DataFrame({"Posted": timestamps})
     df = df.sort_values("Posted")
     df["Posted"] = pd.to_datetime(df["Posted"]).dt.strftime("%Y-%m-%d %H:%M")
+
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "Comment activity over time",
+                    "nl": "Comment activiteit in de loop van de tijd",
+                }
+            ),
+            type="area",
+            group=props.PropsUIChartGroup(column="Posted", dateFormat="auto"),
+            values=[
+                props.PropsUIChartValue(
+                    label="Comment activity",
+                    column="Posted",
+                    aggregate="count",
+                    addZeroes=True,
+                )
+            ],
+        )
+    ]
+
     return ExtractionResult(
         "instagram_comment_activity",
         props.Translatable({"en": "Comment activity", "nl": "Commentaar activiteit"}),
         df,
+        visualizations
     )
 
 
@@ -308,10 +357,33 @@ def extract_posts_liked(zipfile):
     df = pd.DataFrame({"Liked": timestamps, "Link": urls})
     df["Liked"] = pd.to_datetime(df["Liked"]).dt.strftime("%Y-%m-%d %H:%M")
     df = df.sort_values("Liked")
+
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "Posts like per hour of the day",
+                    "nl": "Posts geliked per uur van de dag",
+                }
+            ),
+            type="bar",
+            group=props.PropsUIChartGroup(column="Liked", dateFormat="hour_cycle"),
+            values=[
+                props.PropsUIChartValue(
+                    label="likes",
+                    column="Link",
+                    aggregate="count",
+                    addZeroes=True,
+                )
+            ],
+        )
+    ]
+
     return ExtractionResult(
         "instagram_posts_liked",
         props.Translatable({"en": "Posts Liked", "nl": "Geliked"}),
         df,
+        visualizations
     )
 
 
@@ -366,7 +438,7 @@ def df_from_timestamp_columns(a, b):
         right_on="timestamp",
         how="outer",
     ).sort_index()
-    df["Date"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m-%d")
+    df["Date"] = pd.to_datetime(df["timestamp"]).dt.strftime("%Y-%m-%d %H:00:00")
     df["Timeslot"] = map_to_timeslot(pd.to_datetime(df["timestamp"]).dt.hour)
     df = df.reset_index(drop=True)
     df = (
@@ -392,10 +464,38 @@ def extract_video_posts(zipfile):
     df = df_from_timestamp_columns(
         (video_timestamps, "Videos"), (stories_timestamps(zipfile), "Stories")
     )
+
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "Videos and stories over time",
+                    "nl": "Video's en stories in de loop van de tijd",
+                }
+            ),
+            type="line",
+            group=props.PropsUIChartGroup(column="Date", dateFormat="auto"),
+            values=[
+                props.PropsUIChartValue(
+                    label="Videos",
+                    column="Videos",
+                    aggregate="sum",
+                    addZeroes=True,
+                ),
+                props.PropsUIChartValue(
+                    label="Stories",
+                    column="Stories",
+                    aggregate="sum",
+                    addZeroes=True,
+                )
+            ],
+        )
+    ]
     return ExtractionResult(
         "instagram_video_posts",
         props.Translatable({"en": "Posts", "nl": "Posts"}),
         df,
+        visualizations
     )
 
 
@@ -434,10 +534,39 @@ def extract_comments_and_likes(zipfile):
     df = df_from_timestamp_columns(
         (comment_timestamps, "Comments"), (likes_timestamps, "Likes")
     )
+
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "Comments and likes over time",
+                    "nl": "Comments en likes in de loop van de tijd",
+                }
+            ),
+            type="line",
+            group=props.PropsUIChartGroup(column="Date", dateFormat="auto"),
+            values=[
+                props.PropsUIChartValue(
+                    label="Comments",
+                    column="Comments",
+                    aggregate="sum",
+                    addZeroes=True,
+                ),
+                props.PropsUIChartValue(
+                    label="Likes",
+                    column="Likes",
+                    aggregate="sum",
+                    addZeroes=True,
+                )
+            ],
+        )
+    ]
+
     return ExtractionResult(
         "instagram_comments_and_likes",
         props.Translatable({"en": "Comments and likes", "nl": "Comments en likes"}),
         df,
+        visualizations
     )
 
 
@@ -460,10 +589,39 @@ def extract_viewed(zipfile):
             "Posts",
         ),
     )
+
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "The number of videos and posts you viewed over time",
+                    "nl": "Het aantal video's en berichten dat u in de loop van de tijd heeft bekeken",
+                }
+            ),
+            type="line",
+            group=props.PropsUIChartGroup(column="Date", dateFormat="auto"),
+            values=[
+                props.PropsUIChartValue(
+                    label="Videos",
+                    column="Videos",
+                    aggregate="sum",
+                    addZeroes=True,
+                ),
+                props.PropsUIChartValue(
+                    label="Posts",
+                    column="Posts",
+                    aggregate="sum",
+                    addZeroes=True,
+                )
+            ],
+        )
+    ]
+
     return ExtractionResult(
         "instagram_viewed",
         props.Translatable({"en": "Viewed", "nl": "Viewed"}),
         df,
+        visualizations
     )
 
 
@@ -483,10 +641,32 @@ def extract_session_info(zipfile):
     df = df.drop("End", axis=1)
     df = df.drop("Duration", axis=1)
 
+    visualizations = [
+        props.PropsUIChartVisualization(
+            title=props.Translatable(
+                {
+                    "en": "Number of minutes spent on Instagram over time (!number don't seem right. Needs double check)",
+                    "nl": "Aantal minuten besteed aan Instagram in de loop van de tijd (!number don't seem right. Needs double check)",
+                }
+            ),
+            type="line",
+            group=props.PropsUIChartGroup(column="Start", dateFormat="auto"),
+            values=[
+                props.PropsUIChartValue(
+                    label="Minutes",
+                    column="Duration (in minutes)",
+                    aggregate="sum",
+                    addZeroes=True,
+                )
+            ]
+        )
+    ]
+
     return ExtractionResult(
         "instagram_session_info",
         props.Translatable({"en": "Session information", "nl": "Sessie informatie"}),
         df,
+        visualizations
     )
 
 
@@ -512,7 +692,7 @@ def extract_data(path):
 ######################
 
 
-ExtractionResult = namedtuple("ExtractionResult", ["id", "title", "data_frame"])
+ExtractionResult = namedtuple("ExtractionResult", ["id", "title", "data_frame", "visualizations"])
 
 
 class SkipToNextStep(Exception):
@@ -537,7 +717,7 @@ class DataDonationProcessor:
                 try:
                     extraction_result = self.extract_data(file_result.value)
                 except IOError as e:
-                    raise
+                    # raise
                     self.log(f"prompt confirmation to retry file selection")
                     yield from self.prompt_retry()
                     return
@@ -583,7 +763,7 @@ class DataDonationProcessor:
         log_title = props.Translatable({"en": "Log messages", "nl": "Log berichten"})
 
         tables = [
-            props.PropsUIPromptConsentFormTable(table.id, table.title, table.data_frame)
+            props.PropsUIPromptConsentFormTable(table.id, table.title, table.data_frame, table.visualizations)
             for table in data
         ]
         meta_frame = pd.DataFrame(self.meta_data, columns=["type", "message"])

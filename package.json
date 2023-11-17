@@ -41,7 +41,7 @@
     "release": "npm run build && npm run archive",
     "test": "react-scripts test",
     "lint": "npm run fix:ts",
-    "watch": "concurrently 'npm run dev:start' 'nodemon --ext py --exec \"npm run build:py\"'",
+    "watch": "concurrently 'npm run start:app' 'nodemon --ext py --exec \"npm run build:py\"'",
     "watch:ts": "tsc -watch"
   },
   "browserslist": {

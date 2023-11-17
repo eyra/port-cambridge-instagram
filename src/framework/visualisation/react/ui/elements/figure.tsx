@@ -38,6 +38,7 @@ export const Figure = ({
   handleDelete,
   handleUndo
 }: Props): JSX.Element => {
+  console.log('okdss')
   const [visualizationData, status] = useVisualizationData(table, visualization)
 
   const { title } = useMemo(() => {
@@ -47,7 +48,7 @@ export const Figure = ({
 
   const { errorMsg, noDataMsg } = useMemo(() => prepareCopy(locale), [locale])
 
-  if ((visualizationData == null) && status === 'loading') {
+  if (visualizationData == null && status === 'loading') {
     return (
       <div className='w-12 h-12'>
         <Lottie animationData={spinnerDark} loop />
@@ -55,7 +56,9 @@ export const Figure = ({
     )
   }
 
-  if (status === 'error') { return <div className='flex justify-center items-center text-error'>{errorMsg}</div> }
+  if (status === 'error') {
+    return <div className='flex justify-center items-center text-error'>{errorMsg}</div>
+  }
 
   const visualizationHeightTruthy = Boolean(visualization.height)
   const minHeight = visualizationHeightTruthy ? `${visualization.height ?? ''} px` : '20rem'
@@ -95,8 +98,7 @@ const RenderVisualization = memo(
     }
 
     if (visualizationData.type === 'wordcloud') {
-      const textVisualizationData: TextVisualizationData =
-        visualizationData
+      const textVisualizationData: TextVisualizationData = visualizationData
       if (textVisualizationData.topTerms.length === 0) return fallback
       return <VisxWordcloud visualizationData={textVisualizationData} />
     }

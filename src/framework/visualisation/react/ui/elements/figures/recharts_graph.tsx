@@ -23,6 +23,7 @@ interface Props {
 }
 
 export default function RechartsGraph ({ visualizationData }: Props): JSX.Element | null {
+  console.log(visualizationData)
   function tooltip (): JSX.Element {
     return (
       <Tooltip
@@ -99,7 +100,7 @@ export default function RechartsGraph ({ visualizationData }: Props): JSX.Elemen
   if (visualizationData.type === 'bar') {
     chart = (
       <BarChart data={visualizationData.data}>
-        {axes(0)}
+        {axes(5)}
         {tooltip()}
         {legend()}
         {Object.values(visualizationData.yKeys).map((yKey: AxisSettings, i: number) => {

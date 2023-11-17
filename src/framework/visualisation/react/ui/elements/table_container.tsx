@@ -22,6 +22,7 @@ export const TableContainer = ({
   updateTable,
   locale
 }: TableContainerProps): JSX.Element => {
+  console.log('refresh2')
   const tableVisualizations = table.visualizations != null ? table.visualizations : []
   const [searchFilterIds, setSearchFilterIds] = useState<Set<string>>()
   const [search, setSearch] = useState<string>('')
