@@ -55,27 +55,13 @@ export const SplashScreen = (props: Props): JSX.Element => {
     <>
       <div className='text-bodylarge font-body text-grey1'>
         <div className='mb-4 text-bodylarge font-body text-grey1'>
-          You are about to start the process of donating your data to a research institute. The data that we ask you to donate will be used for academic research to gain insight into how platforms work.
+        You are about to start the process of testing the data donation flow. Please note that this flow is only used for test purposes.
         </div>
         <div className='mb-4 text-bodylarge font-body text-grey1'>
-          We will walk you through this process step by step. During this process no data is stored or sent to a server. You can delete rows from the data before donating. Data will only be donated and stored when you click the button “Yes, donate” on the page that shows your data.
+        We will walk you through this process step by step. During this process no data is stored or sent to a server. When you click the button “Yes, donate” on the page that shows your data, no data is stored or sent to a server.
         </div>
         <div className='mb-6 text-bodylarge font-body text-grey1'>
-          By clicking the button “<span className='font-bodybold'>Yes, donate</span>”:
-        </div>
-        <div className='flex flex-col gap-3 mb-6'>
-          <Bullet>
-            <div>you fully and voluntarily agree to donate your data for this research.</div>
-          </Bullet>
-          <Bullet>
-            <div>you are aware that when your data is used for academic publications, or made publicly available in some other form, this will be anonymous.</div>
-          </Bullet>
-          <Bullet>
-            <div>you are aware that you have the right to withdraw your permission.</div>
-          </Bullet>
-        </div>
-        <div className='mb-10'>
-          This website keeps track of your activity - for example on which pages of this website you click - as part of this research. More information can be found on our privacy page.
+        Thank you in advance for testing the data donation flow. 
         </div>
       </div>
     </>

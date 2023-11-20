@@ -716,10 +716,11 @@ class DataDonationProcessor:
                 self.log(f"extracting file")
                 try:
                     extraction_result = self.extract_data(file_result.value)
-                except IOError as e:
-                    # raise
+                except (IOError, zipfile.BadZipFile):
                     self.log(f"prompt confirmation to retry file selection")
-                    yield from self.prompt_retry()
+                    try_again = yield from self.prompt_retry()
+                    if try_again:
+                        continue
                     return
                 else:
                     if extraction_result is None:
@@ -821,7 +822,7 @@ def render_donation_page(platform, body, progress):
 def retry_confirmation(platform):
     text = props.Translatable(
         {
-            "en": f"Unfortunately, we cannot process your {platform} file. Continue, if you are sure that you selected the right file. Try again to select a different file.",
+            "en": f"Unfortunately, we cannot process your data. Please make sure that you selected a zip file, and JSON as a file format when downloading your data from Instagram.",
             "nl": f"Helaas, kunnen we uw {platform} bestand niet verwerken. Weet u zeker dat u het juiste bestand heeft gekozen? Ga dan verder. Probeer opnieuw als u een ander bestand wilt kiezen.",
         }
     )

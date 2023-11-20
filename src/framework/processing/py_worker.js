@@ -59,14 +59,11 @@ function unwrap(response) {
   })
 }
 
+var fileCounter = 0
+
 function copyFileToPyFS(file, resolve) {
-  directoryName = `/file-input`
-  // pathStats = self.pyodide.FS.analyzePath(directoryName)
-  // if (!pathStats.exists) {
+  directoryName = `/file-input-${fileCounter++}`
   self.pyodide.FS.mkdir(directoryName)
-  // } else {
-  //   self.pyodide.FS.unmount(directoryName)
-  // }
   self.pyodide.FS.mount(
     self.pyodide.FS.filesystems.WORKERFS,
     {
@@ -77,7 +74,6 @@ function copyFileToPyFS(file, resolve) {
   console.log(file.name)
   resolve({ __type__: 'PayloadString', value: directoryName + '/' + file.name })
 }
-
 function initialise() {
   console.log('[ProcessingWorker] initialise')
   return startPyodide()
